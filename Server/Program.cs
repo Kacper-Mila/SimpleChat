@@ -1,9 +1,15 @@
 ﻿using System.Net.Sockets;
 using ChatStream;
+using static ChatStream.Utils;
+
+var serverMessageColor = ConsoleColor.Green;
+var serverUser = "Server";
 
 // Messenger instances for data sending and receiving
 var inStream = new Messenger();
 var outStream = new Messenger();
+// Initialize the database
+var database = new DatabaseHelper();
 
 // A list to keep track of all connected clients
 List<TcpClient> _clients = new List<TcpClient>();
@@ -16,14 +22,11 @@ Console.WriteLine("Server started!");
 
 while (true)
 {
-    // Accept up to 5 pending client connections
     AcceptClients();
-    
-    // Receive message from each connected client
     ReceiveMessage();
 }
 
-// Function to accept client connections
+// Function to accept client connections (max 5 clients)
 void AcceptClients()
 {
     for (int i = 0; i < 5; i++)
@@ -34,6 +37,7 @@ void AcceptClients()
         var client = listener.AcceptTcpClient();
         _clients.Add(client);
         Console.WriteLine("Client accepted!");
+        LoadChatHistory(client);
     }
 }
 
@@ -46,26 +50,90 @@ void ReceiveMessage()
 
         if (stream.DataAvailable)
         {
-            // Read data from the client and parse it into a message packet
-            byte[] buffer = new byte[client.ReceiveBufferSize];
-            int bytesRead = stream.Read(buffer, 0, buffer.Length);
-            (int opcode, Message message) = inStream.ParseMessagePacket(buffer.Take(bytesRead).ToArray());
-            
-            Console.WriteLine($"Received: [{opcode}] | {message}");
-            
-            // Broadcast received message to all other connected clients
-            Broadcast(client, message);
+            try
+            {
+                // Read data from the client and parse it into a message packet
+                byte[] buffer = new byte[client.ReceiveBufferSize];
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                (int opcode, MessageEntity message) = inStream.ParseMessagePacket(buffer.Take(bytesRead).ToArray());
+
+                database.AddMessage(message);
+
+                Console.WriteLine($"Received: [{opcode}] | {message}");
+
+                // Broadcast received message to all other connected clients
+                Broadcast(message, client);
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine($"Error receiving packetsssss: {ex.Message}");
+            }
         }
     }
 }
 
-// Function to broadcast a message from one client to all other connected clients
-void Broadcast(TcpClient sender, Message message)
+// TODO - fix client disconnect issue and fix message history
+void Broadcast(MessageEntity message, TcpClient sender = null)
 {
-    foreach (var client in _clients.Where(x => x != sender))
+    if (sender == null)
     {
-        // Create a message packet and send it to the client
-        var packet = outStream.CreateMessagePacket(10, message);
-        client.GetStream().Write(packet);
+        foreach (var client in _clients)
+        {
+            SendPacket(message, client);
+
+        }
     }
+    else
+    {
+        foreach (var client in _clients.Where(x => x != sender))
+        {
+            SendPacket(message, client);
+        }
+    }
+}
+
+// Create a message packet and send it to the client
+void SendPacket(MessageEntity message, TcpClient client)
+{
+    try
+    {
+        var packet = outStream.CreateMessagePacket(10, message);
+        var stream = client.GetStream();
+        stream.Write(packet);
+        stream.Flush();
+    }
+    catch (IOException ex)
+    {
+        Console.WriteLine($"Error sending packet: {ex.Message}");
+        RemoveClient(client);
+    }
+}
+
+void LoadChatHistory(TcpClient client)
+{
+    List<MessageEntity> messages = new List<MessageEntity>();
+    
+    try
+    { 
+        Task.Run(() => messages = database.GetAllMessages()).Wait();
+    }
+    catch (Exception e)
+    {
+        Console.WriteLine(e);
+        throw;
+    }
+    
+    foreach (MessageEntity message in messages)
+    {
+        Console.WriteLine(message);
+        Task.Run(() => SendPacket(message, client)).Wait();
+    }
+}
+
+// Remove disconnected clients
+void RemoveClient(TcpClient client)
+{
+    _clients.Remove(client);
+    client.Close();
+    Console.WriteLine($"Client disconnected! {client}");
 }

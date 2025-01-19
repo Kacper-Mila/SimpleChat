@@ -1,20 +1,20 @@
 ﻿namespace ChatStream;
 
 // Message class to represent a chat message
-public class Message
+public class MessageEntity
 {
     public string Sender { get; set; }
     public string Content { get; set; }
     public DateTime MessageSent { get; set; }
     
     // Parameterless constructor for deserialization
-    public Message()
+    public MessageEntity()
     {
         MessageSent = DateTime.Now;
     }
 
     // Constructor that takes parameters
-    public Message(string sender, string content, DateTime messageSent)
+    public MessageEntity(string sender, string content, DateTime messageSent)
     {
         Sender = sender;
         Content = content;
