@@ -72,7 +72,7 @@ void ReceiveMessage()
     }
 }
 
-// TODO - fix client disconnect issue and fix message history
+// TODO - fix client disconnect issue
 void Broadcast(MessageEntity message, TcpClient sender = null)
 {
     if (sender == null)
@@ -125,8 +125,8 @@ void LoadChatHistory(TcpClient client)
     
     foreach (MessageEntity message in messages)
     {
-        Console.WriteLine(message);
-        Task.Run(() => SendPacket(message, client)).Wait();
+        
+        Task.Run(async () => { await Task.Delay(10); SendPacket(message, client); }).Wait();
     }
 }
 

@@ -1,6 +1,7 @@
 ﻿using System.Net.Sockets;
 using ChatStream;
 
+
 async Task MainAsync()
 {
     // Define the TCP Client
@@ -60,8 +61,11 @@ async Task ReadPacketsAsync(TcpClient client, Messenger inStream)
             {
                 byte[] buffer = new byte[client.ReceiveBufferSize];
                 int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                (int opcode, MessageEntity message) = inStream.ParseMessagePacket(buffer.Take(bytesRead).ToArray());
-                Console.WriteLine($"{message}");
+                if (bytesRead > 0)
+                {
+                    (int opcode, MessageEntity message) = inStream.ParseMessagePacket(buffer.Take(bytesRead).ToArray());
+                    Console.WriteLine($"{message}");
+                }
             }
             catch (IOException)
             {

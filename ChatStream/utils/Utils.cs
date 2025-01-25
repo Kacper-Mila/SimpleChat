@@ -2,6 +2,9 @@
 
 public static class Utils
 {
+    public static ConsoleColor serverMessageColor = ConsoleColor.Green;
+    public static String serverUser = "Server";
+    
     public static ConsoleColor GetRandomColor()
     {
         var random = new Random();
