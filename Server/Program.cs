@@ -44,7 +44,9 @@ void AcceptClients()
 // Function to receive message from each client
 void ReceiveMessage()
 {
-    foreach (var client in _clients)
+    var clientsCopy = _clients.ToList(); // Create a copy of the _clients list
+
+    foreach (var client in clientsCopy)
     {
         NetworkStream stream = client.GetStream();
 
@@ -66,15 +68,17 @@ void ReceiveMessage()
             }
             catch (IOException ex)
             {
-                Console.WriteLine($"Error receiving packetsssss: {ex.Message}");
+                Console.WriteLine($"Error receiving packets: {ex.Message}");
+                RemoveClient(client);
             }
         }
     }
 }
 
-// TODO - fix client disconnect issue
 void Broadcast(MessageEntity message, TcpClient sender = null)
 {
+    var clientsCopy = _clients.ToList();
+    
     if (sender == null)
     {
         foreach (var client in _clients)
@@ -85,9 +89,16 @@ void Broadcast(MessageEntity message, TcpClient sender = null)
     }
     else
     {
-        foreach (var client in _clients.Where(x => x != sender))
+        foreach (var client in clientsCopy.Where(x => x != sender))
         {
-            SendPacket(message, client);
+            try
+            {
+                SendPacket(message, client);
+            }
+            catch (IOException)
+            {
+                RemoveClient(client);
+            }
         }
     }
 }
@@ -125,7 +136,6 @@ void LoadChatHistory(TcpClient client)
     
     foreach (MessageEntity message in messages)
     {
-        
         Task.Run(async () => { await Task.Delay(10); SendPacket(message, client); }).Wait();
     }
 }
@@ -135,5 +145,5 @@ void RemoveClient(TcpClient client)
 {
     _clients.Remove(client);
     client.Close();
-    Console.WriteLine($"Client disconnected! {client}");
+    Console.WriteLine($"Client disconnected! {_clients.Count} clients connected.");
 }
